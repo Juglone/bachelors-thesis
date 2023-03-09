@@ -1,6 +1,5 @@
-%% 
+%%
 % Run the code from this file. Note that this code may contain errors
-
 %%
 
 clc
@@ -13,9 +12,9 @@ delta_t=40*1e-3; % time between two chirps
 fsample=1/delta_t; % sampling frequency
 fn=fsample/2; % nyquist frequency
 
-name_file='Meas1_R_11_NP_JB_2'; 
-path_file=strcat('C:\Users\julia\OneDrive\Dokument\Chalmers\År 3\Kandidatarbete\Data\', name_file,'.bin'); 
-ADCdata=readDCA1000(path_file,N_sample); 
+name_file='Meas1_R_11_NP_JB_2';
+path_file=strcat('C:\Users\julia\OneDrive\Dokument\Chalmers\År 3\Kandidatarbete\Data\', name_file,'.bin');
+ADCdata=readDCA1000(path_file,N_sample);
 
 %data=zeros(N_frame,1);
 mag=zeros(N_frame,N_sample);
@@ -26,18 +25,18 @@ phase=zeros(N_frame,N_sample);
 
 for p=1:N_frame
     chirp=ADCdata(2*(p-1)*N_sample+1:2:p*2*N_sample);  % the data of each chirp
-    
+
     spec=fft(chirp);  % fft of one chirp
     %range(p,:)= spec;
-    
+
     mag(p,:)=abs(spec);  % magnitude of fft
-    phase(p,:)=angle(spec);  % phase of fft 
-  
+    phase(p,:)=angle(spec);  % phase of fft
+
 end
 
 t=0:delta_t:(N_frame-1)*delta_t; % time array
 
-% select range bin(s) and get an unwraped phase signal. 
+% select range bin(s) and get an unwraped phase signal.
 [phase_unwraped, finalRangeBins, range, m, bin, L] = selectRangeBin_4(mag, phase, N_frame);
 
 
@@ -56,7 +55,7 @@ voltageECG = voltageECG_with_offset-mean(voltageECG_with_offset);
 % this can only be used if ECG measurement ended at the same time as the
 % radar measurement ended and if the ECG measurement was started before the
 % radar measurement
-[ECG_signal, sample_nr_signal] = synchronize_ECG_Radar(voltageECG,sample_nr,delta_tECG,delta_t ,N_frame); 
+[ECG_signal, sample_nr_signal] = synchronize_ECG_Radar(voltageECG,sample_nr,delta_tECG,delta_t ,N_frame);
 tECG = delta_tECG.*sample_nr_signal; % end time for the ECG signal
 
 % Plot ECG signal
@@ -70,16 +69,16 @@ plot(tECG,ECG_signal)
 % interval
 [BPM_ECG, IBI_ECG] = Calculate_rate_ECG(qrs_i_raw, delta_tECG);
 
-% use windowing function. (The reason to why we use windowing function for the ECG signal is that 
-% we do it for the radar signal to avoid false detections of peaks. When we calculate the accuracy and plot the heart rate as a 
-% function of time for both the radar and the ECG it is more clear if a windowing function is applied on both signals and not just 
+% use windowing function. (The reason to why we use windowing function for the ECG signal is that
+% we do it for the radar signal to avoid false detections of peaks. When we calculate the accuracy and plot the heart rate as a
+% function of time for both the radar and the ECG it is more clear if a windowing function is applied on both signals and not just
 % the radar signal)
 [evolution_ECG] = WindowingECG_HR(qrs_i_raw,delta_tECG,length(ECG_signal));
 
 t_ECG=linspace(0,tECG(end),length(BPM_ECG)); % time array for the ECG signal
 t_ECG_ev = linspace(7.5,tECG(end)-7.5,length(evolution_ECG)); % time array for evolution signal
 
-% Plot BPM and IBI for ECG as functions of time 
+% Plot BPM and IBI for ECG as functions of time
 figure(2)
 plot(t_ECG,BPM_ECG, 'LineWidth',0.9)
 ylabel('Hjärtfrekvens [BPM]', 'FontName', 'Times New Roman','FontSize',20,'Color','k', 'Interpreter', 'LaTex')
@@ -95,13 +94,13 @@ plot(t_ECG_ev,evolution_ECG)
 
 %% filter out the heart rate, broad bandpassfilter
 t=0:delta_t:(N_frame-1)*delta_t; % time array
-filter_06_35 = fir1(1500, [0.6/fn,3.5/fn], 'bandpass'); % Broad bandpass filter. The order of the filter and the frequencies may be changed if wanted. 
-% Note: the order of the filter must be even. 
+filter_06_35 = fir1(1500, [0.6/fn,3.5/fn], 'bandpass'); % Broad bandpass filter. The order of the filter and the frequencies may be changed if wanted.
+% Note: the order of the filter must be even.
 HR_06_35 = movmean(filtfilt(filter_06_35,1,phase_unwraped),5); % filtered HR
 
 %% filter out the heart rate, narrow bandpass
-b = fir1(1500, [1/fn,1.5/fn]); % narrow bandpass filter.The order of the filter and the frequencies may be changed if wanted. 
-% Note: the order of the filter must be even. 
+b = fir1(1500, [1/fn,1.5/fn]); % narrow bandpass filter.The order of the filter and the frequencies may be changed if wanted.
+% Note: the order of the filter must be even.
 HR_narrow = movmean((filtfilt(b,1, phase_unwraped)),7); % filtered HR
 
 %% filter out the heart rate by looking at the HR from the ECG signal, apply different bandpass filters on different parts of the signal
@@ -109,11 +108,11 @@ HR_narrow = movmean((filtfilt(b,1, phase_unwraped)),7); % filtered HR
 number_of_samples_filter = 400; % length of each interval is 400 samples = 16 seconds, to be modified if wanted different
 time_filter = number_of_samples_filter*delta_t; % length of an interval in seconds
 ECG_frequency = 1./IBI_ECG; % frequancy of heart beats (in Hz)
-HR_manually_filtered = zeros(length(phase_unwraped),1); 
+HR_manually_filtered = zeros(length(phase_unwraped),1);
 
-end_time = time_filter; % the time of the end point of each interval. For the first interval end_time = 16, 
+end_time = time_filter; % the time of the end point of each interval. For the first interval end_time = 16,
 % for the second interval end_time = 32.... (if time_filter = 16)
-start_time = 0; % the time of the start point of the interval. For the first interval start_time =0, 
+start_time = 0; % the time of the start point of the interval. For the first interval start_time =0,
 % for the second interval start_time =16....
 stop = 0;
 j=1;
@@ -133,7 +132,7 @@ while  stop==0
     end
 
     %Update start_time and end_time:
-    start_time = end_time; 
+    start_time = end_time;
     end_time=end_time + time_filter;
 
 % choose limits for bandpass filter, to be modified if wanted different
@@ -164,7 +163,7 @@ radar_peak_time = index_of_peaks.*delta_t; % the time (in seconds) that correspo
 t_HR=linspace(7.5,t(end)-7.5,length(evolutionHR_f)); % time array corresponding to heart rate evolution from radar (if each window is 15 seconds)
 t_ECG=linspace(7.5,tECG(end)-7.5,length(BPM_ECG)); % time array corresponding to heart rate evolution from ECG (if each window is 15 seconds)
 
-% Plot BPM and IBI for ECG as functions of time 
+% Plot BPM and IBI for ECG as functions of time
 figure(5)
 plot(t_ECG,BPM_ECG)
 hold off
@@ -220,7 +219,7 @@ hb = filtfilt(q,1, phase_unwraped); % HR-signal 0,1 Hz to 3,5 Hz
 % for-loop iterates through the phase signal, 400 samples each time:
 for i = 1:number_of_samples:6000
 heart = movmean(hb(i:i+number_of_samples-1),5); % moving average to remove high frecuency components from noise and random movements
-hw = hann(length(heart)); % hanning window 
+hw = hann(length(heart)); % hanning window
 r = [hw.*heart;zeros(number_of_zeros,1)]; % zero padded signal
 
 Y = fft(r); % applt fft
@@ -236,7 +235,7 @@ amp_breathing = P1(17:75); % amplitude of the frequency interval for breathing
 
 % if we only have one possible breathing peak then that frequency will be
 % considered the breathing frequency, f_b:
-if length(breathing_peaks) == 1 
+if length(breathing_peaks) == 1
 [b_max_value, b_max_index] = maxk(breathing_values,1);
 f_b = f_breathing(breathing_peaks(b_max_index(1))); % breathing frequency
 else
@@ -245,7 +244,7 @@ else
 [b_max_value, b_max_index] = maxk(breathing_values,2);
 f_b_max_1 = f_breathing(breathing_peaks(b_max_index(1))); % frequency with highest amplitude
 f_b_max_2 = f_breathing(breathing_peaks(b_max_index(2))); % frequency with next highest amplitude
-possible_harmonic_b = 0; 
+possible_harmonic_b = 0;
 
 % if f_b_max_2 is the second harmonic of f_b_max_1 possible_harmonic_b = 1, if not possible_harmonic_b = 0
 if (2*f_b_max_1 < f_b_max_2 + 0.07) && (2*f_b_max_1 > f_b_max_2 - 0.07)
@@ -257,18 +256,18 @@ end
 if f_b_max_1 < 0.25 && 0.65*b_max_value(1) < b_max_value(2) && possible_harmonic_b == 0
    f_b = f_b_max_2;
    breathing_max_value = b_max_value(1);
-else 
+else
    f_b = f_b_max_1;
    breathing_max_value = b_max_value(2);
 end
 end
 
 % chose frequncy interval for heart rate:
-% Note: if you change the number of sample that you apply fft on, 
+% Note: if you change the number of sample that you apply fft on,
 % you should also change the values of h_first
 if f_b < 0.35
     h_first = 76;
-elseif f_b < 0.39 
+elseif f_b < 0.39
     h_first = 90;
 elseif f_b < 0.45
     h_first = 96;
@@ -299,7 +298,7 @@ if (2*f_b < f_max_heart(1) + pm_filter_b+0.01) && (2*f_b > (f_max_heart(1) - pm_
     hb_1 = heart;
 else
     low_limit = 2*f_b-0.11;
-    high_limit = 2*f_b+0.11; 
+    high_limit = 2*f_b+0.11;
     hb_1 = bandstop(heart,[low_limit, high_limit],25);
 end
 
@@ -336,7 +335,7 @@ if f_b < 0.35
     f_h1 = f(76:151);
     a_h1 = P1_2(76:151);
     first = 76;
-elseif f_b < 0.39 
+elseif f_b < 0.39
     f_limit = 0.9;
     f_h1 = f(90:151);
     a_h1 = P1_2(90:151);
@@ -359,7 +358,7 @@ else
 end
 
 
-[max_heart, index_max_heart] = maxk([a_h1;P1_2(152:501)],1); % Find the highest peak in the entire frequency interval for the heart rate. Note: since we have applied 
+[max_heart, index_max_heart] = maxk([a_h1;P1_2(152:501)],1); % Find the highest peak in the entire frequency interval for the heart rate. Note: since we have applied
 % a bandpass filter there is no need to look at the the last samples,
 % therefore we only consider at the first 501 samples. (You can look at even fewer samples if wanted)
 [peaks_value_heart_1, peak_index_heart_1] = findpeaks(a_h1); % find the peaks in the first part of the interval
@@ -371,9 +370,9 @@ end
 % removed
 if max_heart_1 > 0.5*max_heart
     f_max_1 = f_h1(peak_index_heart_1(index_heart_1));
-    hb_3 = bandstop(hb_2, [(2*f_max_1-pm_filter),(2*f_max_1+pm_filter)],25); 
+    hb_3 = bandstop(hb_2, [(2*f_max_1-pm_filter),(2*f_max_1+pm_filter)],25);
     h=1;
-else 
+else
     hb_3 = hb_2;
     h=0;
 end
@@ -398,7 +397,7 @@ a_h2 = P1_3(150:300);
 if max_heart_2 > 0.5*max_heart
     f_max_2 = f_h2(index_max_heart_2);
     hb_4 = bandstop(hb_3, [(2*f_max_2-pm_filter),(2*f_max_2+pm_filter)],25);
-else 
+else
     hb_4 = hb_3;
 end
 
@@ -426,12 +425,12 @@ frequency = zeros(6000/number_of_samples,1);
 % apply bandpass filters:
 
 % lower limit of filter is 0,3 Hz lower than the estimated frequency for
-% each interval, higher limit of filter is 0,3 Hz higher than the estimated 
+% each interval, higher limit of filter is 0,3 Hz higher than the estimated
 % frequency for each interval. These limits may be modified if wanted.
 for c = 1:length(f_vec)
     if c == 1 || c == length(f_vec)
         frequency(c) = f_vec(c);
-        filter_low_limit = f_vec(c)-0.3; 
+        filter_low_limit = f_vec(c)-0.3;
         filter_high_limit = f_vec(c)+0.3;
         if filter_low_limit < 0.6
             filter_low_limit = 0.6;
@@ -440,17 +439,17 @@ for c = 1:length(f_vec)
             filter_high_limit = 1.2;
         end
         filter_HR = fir1(120, [filter_low_limit/fn,filter_high_limit/fn], 'bandpass');
-        HR(b:b+number_of_samples-1) = filtfilt(filter_HR,1, phase_unwraped(b:b+number_of_samples-1)); 
+        HR(b:b+number_of_samples-1) = filtfilt(filter_HR,1, phase_unwraped(b:b+number_of_samples-1));
 
     else
         if 60*f_vec(c-1) + 40 < 60*f_vec(c) && 60*f_vec(c+1)+40 < 60*f_vec(c)
             frequency(c) = mean([f_vec(c-1),f_vec(c+1)]);
         elseif 60*f_vec(c-1) - 40 > 60*f_vec(c) && 60*f_vec(c+1)-40 > 60*f_vec(c)
             frequency(c) = mean([f_vec(c-1),f_vec(c+1)]);
-        else 
+        else
             frequency(c) = f_vec(c);
         end
-  
+
         filter_low_limit = frequency(c)-0.3;
         filter_high_limit = frequency(c)+0.3;
         if filter_low_limit < 0.6
@@ -470,7 +469,7 @@ end
 
 [evolutionHR, HR_peak_index, HR_peak_values]=WindowingHR(movmean(HR,5),delta_t,N_frame);
 [rate_evolution] = WindowingECG_HR(qrs_i_raw,delta_tECG,length(ECG_signal));
-t_HR=linspace(7.5,t(end)-7.5,length(evolutionHR)); 
+t_HR=linspace(7.5,t(end)-7.5,length(evolutionHR));
 t_ECG=linspace(0,tECG(end),length(BPM_ECG));
 t_ECG_ev = linspace(7.5,tECG(end)-7.5,length(rate_evolution));
 
@@ -566,7 +565,7 @@ end
 if f_b_max_1 < 0.25 && 0.65*b_max_value(1) < b_max_value(2) && possible_harmonic_b == 0
    f_b = f_b_max_2;
    breathing_max_value = b_max_value(1);
-else 
+else
    f_b = f_b_max_1;
    breathing_max_value = b_max_value(2);
 end
@@ -635,7 +634,7 @@ if f_b < 0.35
     f_h1 = f(76:151);
     a_h1 = P1_2(76:151);
     first = 76;
-elseif f_b < 0.39 
+elseif f_b < 0.39
     f_limit = 0.9;
     % hjärta 0.8911 till 1.4893 Hz
     f_h1 = f(90:151);
@@ -670,7 +669,7 @@ if max_heart_1 > 0.5*max_heart
     f_max_1 = f_h1(peak_index_heart_1(index_heart_1));
     hb_3 = bandstop(hb_2, [(2*f_max_1-pm_filter),(2*f_max_1+pm_filter)],25); % kan behöva öka dessa
     h=1;
-else 
+else
     hb_3 = hb_2;
     h=0;
 end
@@ -695,7 +694,7 @@ if max_heart_2 > 0.5*max_heart
     %s = fir1(98, [(2*f_max_2-0.06)/fn,(2*f_max_2+0.06)/fn], 'stop');
     %hb_4 = filtfilt(s,1, hb_3);
     hb_4 = bandstop(hb_3, [(2*f_max_2-pm_filter),(2*f_max_2+pm_filter)],25);
-else 
+else
     hb_4 = hb_3;
 end
 
@@ -715,7 +714,7 @@ hold on
 xline(f_limit, 'LineWidth',2)
 xline(3.5, 'LineWidth',2)
 
-% 
+%
 [peak_value,peak_index] = findpeaks(P1_4(first:501));
 [max_value, index_value] = maxk(peak_value,1);
 freq = f(first:501);
