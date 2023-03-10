@@ -1,4 +1,4 @@
-% == Radar parameters A ==
+% == Radar parameters B ==
 % This file contains all radar parameters for configuration "A".
 % To load in a script, simply write the name of this file
 
