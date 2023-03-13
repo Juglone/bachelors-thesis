@@ -22,7 +22,9 @@ function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_sam
     log_data = readlines(radarLogPath);
     startTimeSplit = split(log_data(17), "- ");
     % Note, may want to use "H" instead of "HH" or "s" instead of "ss".
-    radar_start_time = datetime(startTimeSplit(2), "InputFormat", "eee MMM dd HH:mm:ss y");
+    radar_time = split(startTimeSplit(2));
+    radar_start_time = datetime(radar_time(4), "InputFormat", "HH:mm:ss");
+    %radar_start_time = datetime(startTimeSplit(2), "InputFormat", "eee MMM dd HH:mm:ss y");
 
     % Read radar data
     radarDataPath = strcat(radarBasePath, radarDataFilename);
