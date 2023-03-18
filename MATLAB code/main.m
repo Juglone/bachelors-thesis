@@ -30,7 +30,7 @@ qrs_i = qrs_i_raw; % Doesn't seem to be a delay
 % Cut off start and end of ECG data to match radar meas
 t_diff = floor(seconds(radar_start_time - ECG_start_time));
 % The time between the start of both meas
-t_meas = 20;                            % Length of the radar meas
+t_meas = num_frames*T_f;                            % Length of the radar meas
 T_ECG = 1/1000;                         % Period of ECG samples
 % Truncate the data
 [qrs_i_trunc, qrs_amp_trunc, ECG_data_trunc] = truncate_ECG(t_diff, t_meas, qrs_i, qrs_amp, ECG_data, T_ECG);
