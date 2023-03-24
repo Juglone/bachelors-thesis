@@ -4,7 +4,7 @@
 % It also reshapes the data so that the data of each chirp is stored in
 % separate rows.
 
-function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_samples, num_frames)
+function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_samples, num_frames, both_lanes)
     % The .bin file you want to read (contains measurement data)
     % The files are named on the form "2023_03_02_radar8.bin"
     radarDataFilename = strcat(date, "_radar", meas_nr, ".bin");
@@ -29,8 +29,11 @@ function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_sam
     % Read radar data
     radarDataPath = strcat(radarBasePath, radarDataFilename);
     radarDataRaw = readDCA1000(radarDataPath, num_samples);
-    radarDataOneRow = radarDataRaw(1:2:end); % Here the data is all stored in one row
-
+    if both_lanes
+        radarDataOneRow = radarDataRaw(1:2:end); % Here the data is all stored in one row
+    else
+        radarDataOneRow = radarDataRaw; % Here the data is all stored in one row
+    end
     % Reshape the data so each chirp is stored in seperate rows
     radar_data = transpose(reshape(radarDataOneRow,[num_samples, num_frames]));
 end
