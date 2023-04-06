@@ -33,8 +33,8 @@ T_ECG = 1/1000; % period of ECG samples
 % Use the following line if using start times
 %ECG_trunc = truncate_ECG(radar_start_time, ECG_start_time, ECG_data, T_ECG, t_meas, 0);
 
-% Use the following line if both meas were stopped at the same time
-num_i_ECG = floor(100/T_ECG);               % num of i corresponding to meas length
+% Use the following lines if both meas were stopped at the same time
+num_i_ECG = floor(t_meas/T_ECG);            % num of i corresponding to meas length
 ECG_trunc = ECG_data(end-num_i_ECG+1:end);  % truncated ECG data
 
 
