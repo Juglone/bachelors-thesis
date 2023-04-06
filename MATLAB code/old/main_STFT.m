@@ -1,10 +1,10 @@
 % == Specificy the meas to be analysed ==
 date = "2023_03_08";    % date of meas
-meas_nr = "3";          % meas number
+meas_nr = "5";          % meas number
 both_lanes = 1;         % 1 = yes, 0 = no
 
 % == Load radar parameters ==
-radar_parameters_B;     % write name of file with parameters used in meas
+radar_parameters_D;     % write name of file with parameters used in meas
 
 % This will give access to the following variables, write over them if
 % needed but remember that they are derived from each other
@@ -31,7 +31,7 @@ qrs_i = qrs_i_raw; % Doesn't seem to be a delay
 % Cut off start and end of ECG data to match radar meas
 t_diff = floor(seconds(radar_start_time - ECG_start_time));
 % The time between the start of both meas
-t_meas = num_frames*T_f;                            % Length of the radar meas
+t_meas = num_frames*T_f;                % Length of the radar meas
 T_ECG = 1/1000;                         % Period of ECG samples
 % Truncate the data
 [qrs_i_trunc, qrs_amp_trunc, ECG_data_trunc] = truncate_ECG(t_diff, t_meas, qrs_i, qrs_amp, ECG_data, T_ECG);
@@ -80,25 +80,26 @@ dev_hp = [0.01 0.01];     % Maximum deviation
 hp_filter = fir1(n_hp,Wn_hp,ftype_hp,kaiser(n_hp+1,beta_hp),'noscale');
 
 % Lowpass filter to filter out high frequencies above 10 Hz
-f_lp = [40 40.4];             % Band edges of filter
-amp_lp = [1 0];             % Band amplitude, highpass 
-dev_lp = [0.01 0.01];       % Maximum deviation
-
-[n_lp,Wn_lp,beta_lp,ftype_lp] = kaiserord(f_lp,amp_lp,dev_lp,fs_radar);
-lp_filter = fir1(n_lp,Wn_lp,ftype_lp,kaiser(n_lp+1,beta_lp),'noscale');
+%f_lp = [40 40.4];             % Band edges of filter
+%amp_lp = [1 0];             % Band amplitude, highpass 
+%dev_lp = [0.01 0.01];       % Maximum deviation
+%
+%[n_lp,Wn_lp,beta_lp,ftype_lp] = kaiserord(f_lp,amp_lp,dev_lp,fs_radar);
+%lp_filter = fir1(n_lp,Wn_lp,ftype_lp,kaiser(n_lp+1,beta_lp),'noscale');
 
 % == Filter the unwrapped phase signal ==
 % Apply highpass filter
 
-lp_filt_phase = filtfilt(lp_filter, 1, unwrapped_phase);
-lp_filt_I = filtfilt(lp_filter, 1, unwrapped_I);
-lp_filt_Q = filtfilt(lp_filter, 1, unwrapped_Q);
+%filt_phase = filtfilt(lp_filter, 1, unwrapped_phase);
+%filt_I = filtfilt(lp_filter, 1, unwrapped_I);
+%filt_Q = filtfilt(lp_filter, 1, unwrapped_Q);
 
 filt_phase = filtfilt(hp_filter, 1, unwrapped_phase);
 filt_I = filtfilt(hp_filter, 1, unwrapped_phase);
 filt_Q = filtfilt(hp_filter, 1, unwrapped_phase);
 
 s_filt = filt_I + sqrt(-1)*filt_Q;
+sig = sqrt(filt_I.^2 + filt_Q.^2);
 
 f_s = [20 20.4];             % Band edges of filter
 amp_s = [1 0];             % Band amplitude, highpass 
@@ -120,10 +121,10 @@ t_radar = T_f*(0:num_frames-1);             % Time vector for chirps/frames
 
 %% STFT new, run this to perform and plot STFT
 hold on
-x = filt_phase;
-fs = 100;
-[a,b,c] = stft(x,fs,"Window", hamming(10),"OverlapLength",8, "FFTLength", 100);
-stft(x,fs,"Window", hamming(10),"OverlapLength",8, "FFTLength", 100)
+x = sig;
+fs = 200;
+[a,b,c] = stft(x,fs,"Window", hamming(20),"OverlapLength",4, "FFTLength", 100);
+stft(x,fs,"Window", hamming(20),"OverlapLength",4, "FFTLength", 100)
 %plot(t_ECG(qrs_i_trunc), 0, "ok") % R-peaks
 
 %% Integrate, filter and plot IBI from STFT
