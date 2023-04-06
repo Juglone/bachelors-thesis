@@ -31,7 +31,8 @@ function plot_FFT_and_bins(num_frames, T_f, num_samples, fft_magnitude, bin_indi
     plot(f,fft_magnitude(index,:))
     plot(f(bin_indices(index)),fft_magnitude(index,bin_indices(index)),'o')
     hold off
-    title('Frekvensspektrum för en svepsignal')
-    xlabel('frekvens [Hz]');
-    ylabel('Amplitud');
+    title('Frequency spectrum of a chirp')
+    legend('FFT', 'detected range bin')
+    xlabel('Frequency [Hz]');
+    ylabel('Amplitude [arb. unit]');
 end

@@ -2,30 +2,36 @@
 % Since the ECG meas is started before the radar meas the data is not
 % matched in time, this function will give a new start and end index for 
 % the ECG data which can be used to truncate the beginning and end of the 
-% ECG data
+% ECG data to sync it with the radar meas
+%
+% Inputs:
+% radar_start_time = start time of radar meas as datetime object
+% ECG_start_time = start time of ECG meas as datetime object
+% ECG_data = data to be truncated
+% t_meas = length of radar measurement
+% add_t_diff = additional time difference, a positive value would cut off
+% more from the beginning of the ECG data
+%
+% Outputs:
+% ECG_trunc = the truncated ECG data
 
-function [qrs_i_trunc, qrs_amp_trunc, ECG_data_trunc] = truncate_ECG(t_diff, t_meas, qrs_i, qrs_amp, ECG_data, T_ECG)
-    start_i = 1 + floor(t_diff/T_ECG);
+function ECG_trunc = truncate_ECG(radar_start_time, ECG_start_time, ECG_data, T_ECG, t_meas, add_t_diff)
+    % Time difference between data sets
+    t_diff = floor(seconds(radar_start_time - ECG_start_time)) + add_t_diff;
+    
+    start_i = floor(t_diff/T_ECG); 
     % The index of the ECG data which corresponds to the start time of the
-    % radar meas, if the index of the R-peaks are lower than this they will
-    % be truncated
+    % radar meas. Data points before this index will be truncated.
     
-    end_i = start_i + t_meas/T_ECG;  
+    end_i = start_i + t_meas/T_ECG; 
     % The index of the ECG data which corresponds to the end time of the
-    % radar meas. Data points after this index will be truncated
+    % radar meas. Data points after this index will be truncated.
     
-    start_counter = 1;  % 1 + num elements to be truncated from start
-    end_counter = 0;    % Num elements to be truncated from end
-    
-    for i = (1:numel(qrs_i))
-        if qrs_i(i) < start_i
-            start_counter = start_counter + 1;
-        elseif qrs_i(i) > end_i
-            end_counter = end_counter + 1;
-        end
-    end 
-    % Truncate all the data
-    qrs_i_trunc = qrs_i(start_counter:end - end_counter) - start_i + 1;
-    qrs_amp_trunc = qrs_amp(start_counter:end - end_counter);
-    ECG_data_trunc = ECG_data(start_i:end_i);
+    ECG_trunc = ECG_data;
+    % Truncate the data 
+    if end_i <= numel(ECG_trunc)
+        ECG_trunc = ECG_data(start_i:end_i);
+    else
+        ECG_trunc = ECG_data(start_i:end);
+    end
 end
