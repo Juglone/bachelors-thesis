@@ -2,7 +2,7 @@
 % This function will load and read the data of the ECG measurement, it
 % gives both the measurement data and the start time of each measurement
 
-function [ECG_data, ECG_start_time] = read_ECG_data(date, meas_nr)
+function [ECG_data, ECG_start_time] = read_ECG_data(date, meas_nr, use_start_times)
     % The .txt file you want to read (contains measurement data and start time)
     ECG_filename = strcat(date, "_ekg", meas_nr, ".txt");
     
@@ -20,11 +20,15 @@ function [ECG_data, ECG_start_time] = read_ECG_data(date, meas_nr)
     
     ECG_data = ECG_data_split(:,3);
     
-    ECG_json_raw = ECG_data_raw(2);
-    ECG_json_raw_trunc = extractAfter(ECG_json_raw, "# ");
+    if use_start_times
+        ECG_json_raw = ECG_data_raw(2);
+        ECG_json_raw_trunc = extractAfter(ECG_json_raw, "# ");
     
-    ECG_json = jsondecode(ECG_json_raw_trunc);
-    ECG_time = getfield(getfield(ECG_json, 'x00_07_80_4B_15_F7'), 'time');
+        ECG_json = jsondecode(ECG_json_raw_trunc);
+        ECG_time = getfield(getfield(ECG_json, 'x00_07_80_4B_15_F7'), 'time');
     
-    ECG_start_time = datetime(ECG_time, "InputFormat", "HH:mm:ss.SSS");  
+        ECG_start_time = datetime(ECG_time, "InputFormat", "HH:mm:ss.SSS");  
+    else
+        ECG_start_time = seconds(0);
+    end
 end

@@ -4,7 +4,7 @@
 % It also reshapes the data so that the data of each chirp is stored in
 % separate rows.
 
-function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_samples, num_frames, both_lanes)
+function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_samples, num_frames, both_lanes, use_start_times)
     % The .bin file you want to read (contains measurement data)
     % The files are named on the form "2023_03_02_radar8.bin"
     radarDataFilename = strcat(date, "_radar", meas_nr, ".bin");
@@ -15,17 +15,21 @@ function [radar_data, radar_start_time] = read_radar_data(date, meas_nr, num_sam
     
     % The base path of the files
     radarBasePath = strcat("C:\Users\tess-\OneDrive\Skrivbord\Kandidatarbete\data\", date, "\");
-
-    % Read start time of measurement
-    radarLogPath = strcat(radarBasePath, radarLogFilename);
-    % Read log file
-    log_data = readlines(radarLogPath);
-    startTimeSplit = split(log_data(17), "- ");
-    % Note, may want to use "H" instead of "HH" or "s" instead of "ss".
-    radar_time = split(startTimeSplit(2));
-    radar_start_time = datetime(radar_time(4), "InputFormat", "HH:mm:ss");
-    %radar_start_time = datetime(startTimeSplit(2), "InputFormat", "eee MMM dd HH:mm:ss y");
-
+    
+    if use_start_times
+        % Read start time of measurement
+        radarLogPath = strcat(radarBasePath, radarLogFilename);
+        % Read log file
+        log_data = readlines(radarLogPath);
+        startTimeSplit = split(log_data(17), "- ");
+        % Note, may want to use "H" instead of "HH" or "s" instead of "ss".
+        radar_time = split(startTimeSplit(2));
+        radar_start_time = datetime(radar_time(4), "InputFormat", "HH:mm:ss");
+        %radar_start_time = datetime(startTimeSplit(2), "InputFormat", "eee MMM dd HH:mm:ss y");
+    else
+        radar_start_time = seconds(0);
+    end
+    
     % Read radar data
     radarDataPath = strcat(radarBasePath, radarDataFilename);
     radarDataRaw = readDCA1000(radarDataPath, num_samples);
