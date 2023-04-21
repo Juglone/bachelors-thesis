@@ -1,6 +1,6 @@
 % == Specificy the meas to be analysed and load parameters ==
 date = "2023_03_14";    % date of meas
-meas_nr = "20";         % meas number
+meas_nr = "19";         % meas number
 both_lanes = 0;         % was data collected from both lanes, 1 = yes, 0 = no
 
 radar_parameters_C;     % name of file with parameters used in meas
@@ -70,7 +70,22 @@ fft_phase = angle(range_fft);   % The angles of each FFT
 % range bin, the method of selecting a range bin will be further developed
 wrapped_phase = fft_phase(:,bin_selected);  % wrapped phase signal
 unwrapped_phase = unwrap(wrapped_phase);    % the unwrapped phase signal 
+unwrapped_test = unwrap(fft_phase(:,bin_selected+1));  % wrapped phase signal
 
+%% Plot detrended data based on found "change points"
+ipt = findchangepts(unwrapped_phase,'Statistic','linear','MinThreshold',5);
+%findchangepts(unwrapped_phase,'Statistic','linear','MinThreshold',100)
+t_ECG = T_ECG*(0:numel(ECG_data)-1);    % time vector for trunc ECG data
+t_radar = T_f*(0:num_frames-1);         % time vector for chirps/frames
+t = t_radar;
+x = unwrapped_phase;
+bp = t_radar(ipt);
+y = detrend(x,1,bp,'SamplePoints',t,'Continuous',true);
+plot(t,x,t,y,t,x-y,':k')
+legend('Input Data','Detrended Data','Trend','Location','northwest') 
+
+detrended_phase = y;
+%%
 
 % == Create filters ==
 fs_radar = 1/T_f;           % sampling frequency
@@ -90,11 +105,11 @@ dev_test = [0.01 0.01];    % maximum deviation
 [n_test,Wn_test,beta_test,ftype_test] = kaiserord(f_test,amp_test,dev_test,fs_radar);
 filter_test = fir1(n_test,Wn_test,ftype_test,kaiser(n_test+1,beta_test),'noscale');
 
-
+filt_signal = detrended_phase;
 % == Filter the unwrapped phase signal ==
 % Apply highpass filter
-filt_phase_08_50 = filtfilt(filter_08_50, 1, unwrapped_phase);
-filt_phase_test = filtfilt(filter_test, 1, unwrapped_phase);
+filt_phase_08_50 = filtfilt(filter_08_50, 1, filt_signal);
+filt_phase_test = filtfilt(filter_test, 1, filt_signal);
 
 % Smooth the filtered signal by using moving average
 smooth_phase_08_50 = smoothdata(filt_phase_08_50, 'movmean', 5);
@@ -106,8 +121,54 @@ smooth_phase_test = smoothdata(filt_phase_test, 'movmean', 5);
 t_ECG = T_ECG*(0:numel(ECG_data)-1);    % time vector for trunc ECG data
 t_radar = T_f*(0:num_frames-1);         % time vector for chirps/frames
 
+
 %% Wavelet analysis to filter out baseline drift and random body movement
-% TO BE DEVELOPED
+
+ssds = zeros(3,1);
+
+cur_lp = unwrapped_phase;
+
+iterations = 0;
+counter = 0; 
+
+name = 'haar';
+
+while 1
+    % Decompose one level
+    [lp,hp] = dwt(cur_lp,name);
+    
+    % Shift and calculate energy of detail/high pass coefficient
+    ssds = vertcat(sum(hp.^2), ssds);
+    
+    if (ssds(3) > ssds(2)) && (ssds(2) < ssds(1))
+        break
+    end
+    cur_lp = lp;
+    iterations = iterations + 1; 
+    counter = counter + 1; 
+        
+end
+baseline = cur_lp;
+
+while 1
+    baseline = idwt(baseline, zeros(numel(baseline),1), name);
+    if iterations == 1
+        break
+    end
+    iterations = iterations -1;
+end
+
+new_baseline = resample(baseline, numel(unwrapped_phase), numel(baseline));
+
+%%
+hold on
+plot(unwrapped_phase)
+plot(new_baseline)
+%%
+hold on
+plot(unwrapped_phase-new_baseline)
+%plot(new_baseline)
+plot(detrended_phase)
 
 %% Plot the possible range bins or other bins
 % bin_possible = []     % add other bins to plot if needed
@@ -120,7 +181,8 @@ end
 % Unwrapped phase signal
 t = tiledlayout(2,1);
 ax1 = nexttile;
-plot(t_radar, unwrapped_phase)      % unfiltered phase
+hold on
+plot(t_radar, detrended_phase)      % unfiltered phase
 title('Unwrapped phase signal, BB*, meas 031420')
 xlabel('Time [s]');
 ylabel('Phase [rad]');
@@ -129,7 +191,7 @@ ylabel('Phase [rad]');
 ax2 = nexttile;
 hold on
 %plot(t_radar, filt_phase)          % filtered phase
-plot(t_radar, filt_phase_test)      % filtered and smoothed phase
+plot(t_radar, filt_phase_08_50)      % filtered and smoothed phase
 
 % plot R-peaks
 r_peaks = t_ECG(abs(qrs_i));
@@ -202,15 +264,22 @@ xlabel('Frequency [Hz]');
 ylabel('Amplitude');
 
 %% Plot detrended data based on found "change points"
-ipt = findchangepts(unwrapped_phase,'Statistic','linear','MinThreshold',100);
+ipt = findchangepts(unwrapped_test,'Statistic','linear','MinThreshold',5);
 %findchangepts(unwrapped_phase,'Statistic','linear','MinThreshold',100)
 
 t = t_radar;
-x = unwrapped_phase;
+x = unwrapped_test;
 bp = t_radar(ipt);
 y = detrend(x,1,bp,'SamplePoints',t,'Continuous',true);
 plot(t,x,t,y,t,x-y,':k')
 legend('Input Data','Detrended Data','Trend','Location','northwest') 
+
+detrended_phase_test = y;
+
+%%
+hold on
+plot(detrended_phase)
+plot(detrended_phase_test)
 
 %% Plot data where deviating data points have been clipped out
 % Should be altered and developed further for the spcified signal
