@@ -1,6 +1,6 @@
 % == Specificy the meas to be analysed and load parameters ==
 date = "2023_04_12";    % date of meas
-meas_nr = "13";          % meas number
+meas_nr = "10";          % meas number
 both_lanes = 1;         % was data collected from both lanes, 1 = yes, 0 = no
 use_start_times = 0;    % 1 = yes, 0 = no, for new meas this should be 0
 
@@ -70,92 +70,131 @@ for i = 1:num_bins
 end
 
 
-% == Perform wavelet decomposition == 
-% Use wavelets to decompose signal 2 levels, save d1 and d2 seperately
-p_d1 = zeros(num_frames, num_bins);
-p_d2 = zeros(num_frames, num_bins);
+p_filtered = zeros(num_frames, num_bins);
 for i = 1:num_bins
-    [p_a1(:,i), p_d1(:,i)] = wavelet_leveldepend(p_unwrapped(:,i),'db6',1,0,10,0);
-    [p_a2(:,i), p_d2(:,i)] = wavelet_leveldepend(p_unwrapped(:,i),'db6',2,0,10,0);
+    T = wpdec(p_unwrapped(:,i),5,'db6');
+    p_filtered(:,i) = wprcoef(T,[0 0])-wprcoef(T,[2 0]);
 end
 
+% Normalize
+std_filt = std(p_filtered);
+p_filt_norm = p_filtered./std_filt;
 
-% == Zero the endpoints of the signals ==
-for i = 1:num_bins
-    num_zeros = 10;     % choose how many frames to zero at the ends of signal
-    p_d1([1:num_zeros, end-num_zeros:end], i)= 0;
-    p_d2([1:num_zeros, end-num_zeros:end], i)= 0;
-end
+% == Calculate SPC of all bins ==
+SPC = zeros(num_bins);
 
-
-% == Normalize the signals (details) using std ==
-% detail 1
-std_d1 = std(p_d1);
-p_d1_norm = p_d1./std_d1;
-
-% detail 2
-std_d2 = std(p_d2);
-p_d2_norm = p_d2./std_d2;
-
-
-% == Calculate SPC for d1 and d2 of all bins ==
-SPC_d1 = zeros(num_bins);
-SPC_d2 = zeros(num_bins);
 for i = 1:num_bins
     for j = 1:num_bins
         if i == j
-            SPC_d1(i,j) = 0;
-            SPC_d2(i,j) = 0;
+            SPC(i,j) = 0;
         else
-            SPC_d1(i,j) = sum(p_d1_norm(:,i).*p_d1_norm(:,j));
-            SPC_d2(i,j) = sum(p_d2_norm(:,i).*p_d2_norm(:,j));
+            SPC(i,j) = sum(p_filt_norm(:,i).*p_filt_norm(:,j));
         end
     end
 end
 
-SPC_tot = SPC_d1 + SPC_d2;
 
 %% Plot SPC of filtered signal vs filtered and despiked signal 
 % This step is not necessary for the analysis
-[X,Y] = meshgrid(1:num_bins,1:num_bins);
+[X1,Y1] = meshgrid(1:num_bins,1:num_bins);
 
 figure
-surface(X,Y,SPC_d1)
+surface(X1,Y1,SPC)
 colorbar
-title('SPC of d1')
+title('SPC of all bins')
 
-figure
-surface(X,Y,SPC_d2)
-colorbar
-title('SPC of d2')
 
-figure
-surface(X,Y,SPC_tot)
-colorbar
-title('Sum of SPC d1 and d2')
+
 
 %% Select main bin of interest
 % Automatically pick bin of interest by computing the sum of the SPC for
 % each bin and choosing the bin of highest peak
 % d2 seems to show better snr so we use the SCP for d2, guessing that since 
 % d1 contains higher frequencies it might be comparable to noise
-[foo, b_max] = max(sum(SPC_tot));
+[foo, b_max] = max(sum(SPC));
 
 % Manually pick main bin of interest based on plots
 %b_max = 
-
+figure
 hold on
-plot(sum(SPC_d1))
-plot(sum(SPC_d2))
-plot(sum(SPC_tot)) % we find the highest peak in this plot
-legend('sum of SPC d1', 'sum of SPC d2', 'sum of SPC d1 and d2')
+plot(sum(SPC)) % we find the highest peak in this plot
+legend('sum of SPC')
+
+
+%% == Plot FFT of signal ==
+% This step is not necessary for the analysis
+signal = fft(p_filtered(:,b_max)); % signal to do FFT on
+Fs = 100;
+L = num_frames;
+
+P2 = abs(signal/L);
+P1 = P2(1:L/2+1);
+P1(2:end-1) = 2*P1(2:end-1);
+
+f = Fs*(0:(L/2))/L;
+hold on
+plot(f,P1)
+title('FFT of HP filtered phase signal, FB*, meas 031414')
+xlabel('Frequency [Hz]');
+ylabel('Amplitude');
+
+f_lim = [12.5,18.75,21.875,25,31.25,37.5,43.75,50];
+for i = f_lim
+    xline(i,'--k')
+end
+
+f_lim_index = [251, 361, 421, 501, 621, 741, 861,1001];
+
+weights = 0;
+for i = 1:numel(f_lim_index)-1
+    weights(i) = sum(P1(f_lim_index(i):f_lim_index(i+1)))./numel(P1(f_lim_index(i):f_lim_index(i+1)));
+;
+end
+
+weights(1) = weights(1)*1;
+weights_norm = weights./sum(weights);
+
+
+%%
+
+% == Perform wavelet tree decomposition == 
+% Use wavelets to decompose signal 2 levels, save d1 and d2 seperately
+p_wavelet = zeros(num_frames, num_bins);
+
+for i = 1:num_bins
+    movmeanw = 10;
+    T = wpdec(p_unwrapped(:,i),5,'db6');
+    C0 = movmean(abs(wprcoef(T,[3 2])./std(wprcoef(T,[3 2]))),movmeanw).*weights(1);
+    C1 = movmean(abs(wprcoef(T,[4 6])./std(wprcoef(T,[4 6]))),movmeanw).*weights(2);
+    C2 = movmean(abs(wprcoef(T,[4 7])./std(wprcoef(T,[4 7]))),movmeanw).*weights(3);
+    C3 = movmean(abs(wprcoef(T,[3 4])./std(wprcoef(T,[3 4]))),movmeanw).*weights(4);
+    C4 = movmean(abs(wprcoef(T,[3 5])./std(wprcoef(T,[3 5]))),movmeanw).*weights(5);
+    C5 = movmean(abs(wprcoef(T,[3 6])./std(wprcoef(T,[3 6]))),movmeanw).*weights(6);
+    C6 = movmean(abs(wprcoef(T,[3 7])./std(wprcoef(T,[3 7]))),movmeanw).*weights(7);
+    
+    p_filtered(:,i) = wprcoef(T,[0 0])-wprcoef(T,[2 0]);
+    p_wavelet(:,i) = movmean(C0+C1+C2+C3+C4+C5+C6,20);
+end
+
+
+% == Zero the endpoints of the signals ==
+for i = 1:num_bins
+    num_zeros = 10;     % choose how many frames to zero at the ends of signal
+    p_wavelet([1:num_zeros, end-num_zeros:end], i)= 0;
+end
+
+
+% == Normalize the signals using std ==
+% detail 1
+std_wav = std(p_wavelet);
+p_norm = p_wavelet./std_wav;
 
 %% Select other bins of interest 
 % Specify the SPC for the main bin of interest
-SPC_max = SPC_tot(b_max,:);
+SPC_max = SPC(b_max,:);
 
 % Automatically choose k bins of highest peaks
-[foo, b_interest] = maxk(SPC_max,2);
+[foo, b_interest] = maxk(SPC_max,4);
 
 % Add b_max to the bins of interest
 b_interest(end+1) = b_max;
@@ -166,6 +205,7 @@ b_interest = sort(b_interest);
 % Manually select other bins of interest by looking at the plot
 %b_interest = [b_max,4,10,11];
 
+figure
 hold on
 plot(SPC_max) % we find the k highest peaks in this plot
 
@@ -174,68 +214,31 @@ plot(SPC_max) % we find the k highest peaks in this plot
 for i = 1:numel(b_interest)
     subplot(numel(b_interest), 1, i)
     hold on
-    plot(t_radar, p_d1_norm(:,b_interest(i)))
-    plot(t_radar, p_d2_norm(:,b_interest(i)))
+    plot(t_radar, p_norm(:,b_interest(i)))
     r_peaks = t_ECG(abs(qrs_i));
     for j = r_peaks
         xline(j,'--k')
     end
     hold off
-    legend('d1','d2')
+    legend('signal')
     title(['Decomposed signal from bin ' num2str(b_interest(i))])
 end
 
-%% == Plot absolute values of d1 and d2 ==
-% This step is not necessary for the analysis
-for i = 1:numel(b_interest)
-    subplot(numel(b_interest), 1, i)
-    hold on
-    plot(t_radar,movmean(abs(p_d1_norm(:,b_interest(i))),1))
-    plot(t_radar,movmean(abs(p_d2_norm(:,b_interest(i))),1))
-    r_peaks = t_ECG(abs(qrs_i));
-    for j = r_peaks
-        xline(j,'--k')
-    end
-    hold off
-    legend('abs(d1)','abs(d2)')
-    title(['Absolute value of decomposed signal from bin ' num2str(b_interest(i))])
-end
-
-
-%% == Compute the product between the absolute values of d1 and d2 ==
-p_d1_abs = movmean(abs(p_d1_norm),1);
-p_d2_abs = movmean(abs(p_d2_norm),1);
-
-SPC_d1d2 = zeros(num_frames,numel(b_interest));
-for i = 1:numel(b_interest)
-    product = movmean(p_d1_abs(:,b_interest(i)).*p_d2_abs(:,b_interest(i)),10);
-    SPC_d1d2(:,i) = product;
-end
-
-
-hold on
-plot(t_radar, movmean(SPC_d1d2,1))
-title('Product between abs values of d1 and d2') 
-
-r_peaks = t_ECG(abs(qrs_i));
-for i = r_peaks
-    xline(i,'--k')
-end
-hold off
 
 %% == Find and plot peaks of individual bins ==
 % This step is not necessary for the analysis
-signal = movmean(SPC_d1d2,20);
+signal = movmean(p_norm,1);
 pks = cell(numel(b_interest), 1);
 locs = cell(numel(b_interest), 1);
 for i = 1:numel(b_interest)
-    [pks{i}, locs{i}] = findpeaks(signal(:,i),'MinPeakDistance',50);
+    [pks{i}, locs{i}] = findpeaks(signal(:,b_interest(i)),'MinPeakProminence',0.5);
 end
 
+figure
 for i = 1:numel(b_interest)
     subplot(numel(b_interest), 1, i)
     hold on
-    plot(t_radar, signal(:,i))
+    plot(t_radar, signal(:,b_interest(i)))
     plot(t_radar(locs{i}), pks{i},'o')
     r_peaks = t_ECG(abs(qrs_i));
     for j = r_peaks
@@ -247,9 +250,9 @@ end
 
 %% == Find and plot peaks of sum of all bins ==
 % Moving average of window with 10 samples seems to be pretty good
-signal = movmean(sum(SPC_d1d2,2),20);
+signal = sum(p_norm(:,b_interest(1)),2);
 
-[pks, locs] = findpeaks(signal,'MinPeakDistance',50);
+[pks, locs] = findpeaks(signal,'MinPeakProminence', 0.6, 'MinPeakDistance',0);
 
 % Remove certain peaks if necessary 
 remove = [];
@@ -257,6 +260,7 @@ pks(remove) = [];
 locs(remove) = [];
 
 % Plot the found peaks compared to ECG
+figure
 hold on
 plot(t_radar, signal)
 plot(t_radar(locs), pks,'o')
@@ -285,7 +289,7 @@ end
 figure
 hold on
 plot(t_ECG(abs(qrs_i(1:end-1))), IBI_ECG, "k")
-plot(t_radar(locs(1:end-1)),movmean(IBI_phase,2), "r")
+plot(t_radar(locs(1:end-1)),movmean(IBI_phase,1), "r")
 
 
 %% == Interpolate IBI from ECG and calculate accuracy ==
@@ -295,7 +299,7 @@ t_IBI_radar = locs(1:end-1).*T_f;   % time vector of the IBI from radar
 IBI_ECG_interp = interp1(t_IBI_ECG,IBI_ECG,t_IBI_radar,'linear','extrap');
 
 % choose window length for movmean
-IBI_radar = movmean(IBI_phase,4);
+IBI_radar = movmean(IBI_phase,1);
 
 nog = 0;
 for i = 1:numel(IBI_radar)
@@ -311,20 +315,4 @@ legend('ECG','Radar')
 
 medelv = mean(nog)
 media = median(nog)
-
-%% == Plot FFT of signal ==
-% This step is not necessary for the analysis
-signal = fft(signal); % signal to do FFT on
-Fs = 100;
-L = num_frames;
-
-P2 = abs(signal/L);
-P1 = P2(1:L/2+1);
-P1(2:end-1) = 2*P1(2:end-1);
-
-f = Fs*(0:(L/2))/L;
-plot(f,P1)
-title('FFT of HP filtered phase signal, FB*, meas 031414')
-xlabel('Frequency [Hz]');
-ylabel('Amplitude');
 
