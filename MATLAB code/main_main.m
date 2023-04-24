@@ -313,7 +313,7 @@ end
 figure
 hold on
 plot(t_ECG(abs(qrs_i(1:end-1))), IBI_ECG, "k")
-plot(t_radar(locs(1:end-1)),movmean(IBI_phase,3), "r")
+plot(t_radar(locs(1:end-1)),movmean(IBI_phase,4), "r")
 
 
 %% == Interpolate IBI from ECG and calculate accuracy ==
@@ -323,11 +323,11 @@ t_IBI_radar = locs(1:end-1).*T_f;   % time vector of the IBI from radar
 IBI_ECG_interp = interp1(t_IBI_ECG,IBI_ECG,t_IBI_radar,'linear','extrap');
 
 % choose window length for movmean
-IBI_radar = movmean(IBI_phase,3);
+IBI_radar = movmean(IBI_phase,4);
 
 nog = 0;
 for i = 1:numel(IBI_radar)
-    nog(i) = (IBI_radar(i)-abs(IBI_radar(i)-IBI_ECG_interp(i)))./IBI_radar(i);
+    nog(i) = (IBI_ECG_interp(i)-abs(IBI_ECG_interp(i)-IBI_radar(i)))./IBI_ECG_interp(i);
 end
 
 figure
