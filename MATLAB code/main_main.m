@@ -1,10 +1,10 @@
 % == Specificy the meas to be analysed and load parameters ==
-date = "2023_04_12";    % date of meas
-meas_nr = "13";          % meas number
+date = "2023_03_08";    % date of meas
+meas_nr = "3";          % meas number
 both_lanes = 1;         % was data collected from both lanes, 1 = yes, 0 = no
 use_start_times = 0;    % 1 = yes, 0 = no, for new meas this should be 0
 
-radar_parameters_E;     % name of file with parameters used in meas
+radar_parameters_B;     % name of file with parameters used in meas
 
 % This should give access to the following variables
 num_frames;             % number of frames = number of chirps
@@ -70,6 +70,21 @@ for i = 1:num_bins
 end
 
 
+% == Filter signals for SPC ==
+% Filter one
+fs_radar = 100;
+f_1 = [24.5 25];          % band edges of filter
+amp_1 = [0 1];          % band amplitude
+dev_1 = [0.01 0.01];    % maximum deviation
+[n_1,Wn_1,beta_1,ftype_1] = kaiserord(f_1,amp_1,dev_1,fs_radar);
+filter_1 = fir1(n_1,Wn_1,ftype_1,kaiser(n_1+1,beta_1),'noscale');
+
+
+p_filtered = zeros(num_frames, num_bins);
+for i = 1:num_bins
+    p_filtered(:,i) = filtfilt(filter_1, 1, p_unwrapped(:,i));
+end
+
 % == Perform wavelet decomposition == 
 % Use wavelets to decompose signal 2 levels, save d1 and d2 seperately
 p_d1 = zeros(num_frames, num_bins);
@@ -85,6 +100,7 @@ for i = 1:num_bins
     num_zeros = 10;     % choose how many frames to zero at the ends of signal
     p_d1([1:num_zeros, end-num_zeros:end], i)= 0;
     p_d2([1:num_zeros, end-num_zeros:end], i)= 0;
+    p_filtered([1:num_zeros, end-num_zeros:end], i)= 0;
 end
 
 
@@ -97,23 +113,34 @@ p_d1_norm = p_d1./std_d1;
 std_d2 = std(p_d2);
 p_d2_norm = p_d2./std_d2;
 
+% filtered
+std_filt = std(p_filtered);
+p_filt_norm = p_filtered./std_filt;
 
 % == Calculate SPC for d1 and d2 of all bins ==
 SPC_d1 = zeros(num_bins);
 SPC_d2 = zeros(num_bins);
+SPC_filtered = zeros(num_bins);
 for i = 1:num_bins
     for j = 1:num_bins
         if i == j
             SPC_d1(i,j) = 0;
             SPC_d2(i,j) = 0;
+            SPC_filtered(i,j) = 0;
         else
             SPC_d1(i,j) = sum(p_d1_norm(:,i).*p_d1_norm(:,j));
             SPC_d2(i,j) = sum(p_d2_norm(:,i).*p_d2_norm(:,j));
+            SPC_filtered(i,j) = sum(p_filt_norm(:,i).*p_filt_norm(:,j));
         end
     end
 end
 
 SPC_tot = SPC_d1 + SPC_d2;
+
+figure
+surface(X,Y,SPC_filtered)
+colorbar
+title('SPC of filtered signals')
 
 %% Plot SPC of filtered signal vs filtered and despiked signal 
 % This step is not necessary for the analysis
@@ -139,16 +166,17 @@ title('Sum of SPC d1 and d2')
 % each bin and choosing the bin of highest peak
 % d2 seems to show better snr so we use the SCP for d2, guessing that since 
 % d1 contains higher frequencies it might be comparable to noise
-[foo, b_max] = max(sum(SPC_tot));
+[foo, b_max] = max(sum(SPC_filtered));
 
 % Manually pick main bin of interest based on plots
 %b_max = 
 
 hold on
+plot(sum(SPC_filtered))
 plot(sum(SPC_d1))
 plot(sum(SPC_d2))
 plot(sum(SPC_tot)) % we find the highest peak in this plot
-legend('sum of SPC d1', 'sum of SPC d2', 'sum of SPC d1 and d2')
+legend('filtered','sum of SPC d1', 'sum of SPC d2', 'sum of SPC d1 and d2')
 
 %% Select other bins of interest 
 % Specify the SPC for the main bin of interest
@@ -285,7 +313,7 @@ end
 figure
 hold on
 plot(t_ECG(abs(qrs_i(1:end-1))), IBI_ECG, "k")
-plot(t_radar(locs(1:end-1)),movmean(IBI_phase,2), "r")
+plot(t_radar(locs(1:end-1)),movmean(IBI_phase,3), "r")
 
 
 %% == Interpolate IBI from ECG and calculate accuracy ==
@@ -295,7 +323,7 @@ t_IBI_radar = locs(1:end-1).*T_f;   % time vector of the IBI from radar
 IBI_ECG_interp = interp1(t_IBI_ECG,IBI_ECG,t_IBI_radar,'linear','extrap');
 
 % choose window length for movmean
-IBI_radar = movmean(IBI_phase,4);
+IBI_radar = movmean(IBI_phase,3);
 
 nog = 0;
 for i = 1:numel(IBI_radar)
